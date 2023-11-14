@@ -1,0 +1,67 @@
+version: '3'
+
+services:
+  poll:
+    image: python:3
+    build: ./poll
+    networks:
+      - poll-tier
+    restart: "always"
+    environment:
+      - host=0.0.0.0
+    depends_on:
+      - redis
+    ports:
+      - "5000:80"
+  
+  result:
+    image: node:12-alpine
+    ports:
+      - "6379:6379"
+    depends_on:
+      - db
+    restart: "always"
+  
+  redis:
+    image: redis:alpine
+    expose:
+      - 6379
+    ports:
+      - "6379:6379"
+    depends_on:
+      - db
+    networks:
+      - poll-tier
+      - back-tier
+    restart: "always"
+  
+  db:
+    image: postgres:11.6-alpine
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - "./schema.sql:/docker-entrypoint-initdb.d/init.sql"
+    networks:
+      - result-tier
+      - back-tier
+    restart: "always"
+    environment:
+      - "POSTGRES_USER=postgres"
+      - "POSTGRES_PASSWORD=password"
+  
+  worker:
+    build: ./worker
+    networks:
+      - back-tier
+    restart: "always"
+    environment:
+      - host=0.0.0.0
+    depends_on:
+      - db
+
+networks:
+    poll-tier:
+    result-tier:
+    back-tier:
+
+volumes:
+  db-data:
